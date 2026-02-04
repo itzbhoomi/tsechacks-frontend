@@ -17,8 +17,71 @@ const analyticsData = [
 
 const budgetLabels = ["Production", "Marketing", "Logistics", "Platform Fees"];
 
+// --- NEW COMPONENT: Displayed only when project is fully reimbursed ---
+const ProjectImpactCard = ({ project }) => {
+  const [stats, setStats] = useState({ 
+    channelName: "Creative Hub", 
+    views: "Loading...", 
+    likes: "...", 
+    comments: "...", 
+    raised: "..." 
+  });
+
+  useEffect(() => {
+    // Simulate API call for YT stats
+    const timer = setTimeout(() => {
+      setStats({
+        channelName: "Creative Minds Hub",
+        views: (Math.random() * 500000 + 10000).toFixed(0),
+        likes: (Math.random() * 50000 + 500).toFixed(0),
+        comments: (Math.random() * 2000 + 50).toFixed(0),
+        raised: (Math.random() * 10000 + 2000).toFixed(2),
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="rounded-2xl border border-green-200 bg-white p-5 shadow-sm transition hover:shadow-md relative overflow-hidden">
+      <div className="absolute top-0 right-0 bg-green-500 text-white text-[10px] px-2 py-1 rounded-bl-lg font-bold">
+        COMPLETED
+      </div>
+      <h3 className="font-serif font-medium text-lg text-gray-900">{project.title}</h3>
+      <p className="text-xs text-gray-500 mb-4 line-clamp-1">{project.overview}</p>
+
+      {/* Impact Stats Grid */}
+      <div className="space-y-3">
+         <div className="flex items-center gap-3">
+             <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xs">▶</div>
+             <div>
+                 <p className="text-xs font-bold text-gray-700">{stats.channelName}</p>
+                 <p className="text-[10px] text-gray-500">Official Channel</p>
+             </div>
+         </div>
+         
+         <div className="grid grid-cols-2 gap-2">
+            <div className="bg-gray-50 p-2 rounded-lg border">
+                <p className="text-[10px] text-gray-400 font-bold uppercase">Views</p>
+                <p className="font-semibold text-gray-800">{parseInt(stats.views).toLocaleString()}</p>
+            </div>
+            <div className="bg-green-50 p-2 rounded-lg border border-green-100">
+                <p className="text-[10px] text-green-600 font-bold uppercase">Raised</p>
+                <p className="font-semibold text-green-700">${parseInt(stats.raised).toLocaleString()}</p>
+            </div>
+         </div>
+
+         <div className="flex justify-between text-[11px] text-gray-500 pt-1 border-t">
+             <span>👍 {parseInt(stats.likes).toLocaleString()} Likes</span>
+             <span>💬 {parseInt(stats.comments).toLocaleString()} Comments</span>
+         </div>
+      </div>
+    </div>
+  );
+};
+
+
 export default function Profile() {
-  const [ongoingProjects, setOngoingProjects] = useState([]);
+  const [allProjects, setAllProjects] = useState([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [poolTotal, setPoolTotal] = useState(0);
@@ -60,22 +123,22 @@ export default function Profile() {
       try {
         const q = query(collection(db, "projects"), orderBy("createdAt", "desc"));
         const snap = await getDocs(q);
-        setOngoingProjects(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => !p.completed));
+        setAllProjects(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) { console.error(err); }
     };
     fetchProjects();
-  }, []);
+  }, [selectedProject]);
 
   const handleAddProject = async (e) => {
     e.preventDefault();
     const newProject = {
       title: newTitle.trim(), category: newCategory, overview: newOverview.trim(),
       timeline, contributions, budget, totalBudget: budget.reduce((a, b) => a + b, 0),
-      progress: 0, completed: false, createdAt: serverTimestamp(),
+      progress: 0, completed: false, fullyReimbursed: false, createdAt: serverTimestamp(),
     };
     try {
       const docRef = await addDoc(collection(db, "projects"), newProject);
-      setOngoingProjects(prev => [{ id: docRef.id, ...newProject }, ...prev]);
+      setAllProjects(prev => [{ id: docRef.id, ...newProject }, ...prev]);
       setIsAddModalOpen(false);
       setNewTitle(""); setNewCategory(""); setNewOverview(""); setTimeline(["", "", "", ""]); setContributions([]); setBudget([0, 0, 0, 0]);
     } catch (err) { alert("Could not create project"); }
@@ -93,7 +156,6 @@ export default function Profile() {
             <div className="flex-1">
               <h1 className="flex items-center gap-2 font-serif text-3xl">{randomUser.name} <span className="text-[#7FAAF5]">✔</span></h1>
               <p className="mt-1 text-sm text-gray-600">Digital Artist & Innovator</p>
-              <p className="mt-3 max-w-xl text-sm text-gray-600">Creating interactive art and immersive experiences. Passionate about community-driven creation.</p>
               <div className="mt-5 flex gap-3">
                 <button className="rounded-xl bg-[#7FAAF5] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#6a9ce6]">Hire Me</button>
                 <button className="rounded-xl border border-gray-300 px-6 py-2.5 text-sm hover:bg-gray-50">Message</button>
@@ -104,19 +166,25 @@ export default function Profile() {
 
         <section className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[65%_35%]">
           <div className="space-y-10">
+            {/* Dynamic Projects Section */}
             <div>
-              <div className="mb-5 flex items-center justify-between"><h2 className="font-serif text-2xl">Ongoing Projects</h2><button onClick={() => setIsAddModalOpen(true)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">+ Add Project</button></div>
+              <div className="mb-5 flex items-center justify-between"><h2 className="font-serif text-2xl">Projects & Impact</h2><button onClick={() => setIsAddModalOpen(true)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">+ Add Project</button></div>
               <div className="grid gap-5 sm:grid-cols-2">
-                {ongoingProjects.map(p => (
-                  <div key={p.id} onClick={() => setSelectedProject(p)} className="cursor-pointer rounded-2xl border border-[#E1EAF8] bg-[#F9FBFF] p-5 transition hover:shadow-md">
-                    <p className="font-medium">{p.title}</p>
-                    <p className="mt-1 line-clamp-2 text-sm text-gray-600">{p.overview}</p>
-                    <span className="mt-2 inline-block rounded-full bg-[#7FAAF5]/10 px-3 py-0.5 text-xs text-[#5F93F3]">Active</span>
-                  </div>
+                {allProjects.map(p => (
+                  p.completed || p.fullyReimbursed ? (
+                    <ProjectImpactCard key={p.id} project={p} />
+                  ) : (
+                    <div key={p.id} onClick={() => setSelectedProject(p)} className="cursor-pointer rounded-2xl border border-[#E1EAF8] bg-[#F9FBFF] p-5 transition hover:shadow-md">
+                      <p className="font-medium">{p.title}</p>
+                      <p className="mt-1 line-clamp-2 text-sm text-gray-600">{p.overview}</p>
+                      <span className="mt-2 inline-block rounded-full bg-[#7FAAF5]/10 px-3 py-0.5 text-xs text-[#5F93F3]">Active</span>
+                    </div>
+                  )
                 ))}
               </div>
             </div>
 
+            {/* RESTORED PAST PROJECTS SECTION */}
             <div>
               <h2 className="mb-5 font-serif text-2xl">Past Projects</h2>
               <div className="grid gap-5 sm:grid-cols-2">
