@@ -27,6 +27,7 @@ const ProjectImpactCard = ({ project }) => {
     raised: "..." 
   });
 
+
   useEffect(() => {
     // Simulate API call for YT stats
     const timer = setTimeout(() => {
@@ -93,8 +94,44 @@ export default function Profile() {
   const [timeline, setTimeline] = useState(["", "", "", ""]);
   const [contributions, setContributions] = useState([]);
   const [budget, setBudget] = useState([0, 0, 0, 0]);
+   // 🧠 AI TOOL STATE (ADDED)
+    const [aiLoading, setAiLoading] = useState(false);
 
   const userRole = typeof window !== "undefined" ? localStorage.getItem("userRole") || "contributor" : "contributor";
+
+  // 🧠 AI HANDLER (ADDED)
+ const handleGenerateAISummary = async () => {
+  if (!newTitle.trim() || !newOverview.trim()) {
+    alert("Enter title and overview first");
+    return;
+  }
+
+  try {
+    setAiLoading(true);
+
+    const res = await fetch("/api/ai-summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: newTitle,
+        description: newOverview,
+      }),
+    });
+
+    if (!res.ok) throw new Error("AI failed");
+
+    const data = await res.json();
+
+    if (data.catchy_title) setNewTitle(data.catchy_title);
+    if (data.shark_tank_summary) setNewOverview(data.shark_tank_summary);
+
+  } catch (err) {
+    console.error(err);
+    alert("AI service unavailable");
+  } finally {
+    setAiLoading(false);
+  }
+};
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -261,6 +298,28 @@ export default function Profile() {
                   ))}
                   <div className="mt-4 text-right text-sm font-medium">Total: <span className="text-lg">${budget.reduce((a, b) => a + b, 0).toLocaleString()}</span></div>
                 </div>
+                {/* 🧠 AI TOOL UI (ADDED) */}
+              <div className="flex justify-between items-center">
+  <label className="block text-sm font-medium">Overview</label>
+
+  <button
+    type="button"
+    onClick={handleGenerateAISummary}
+    disabled={aiLoading}
+    className="text-xs font-semibold text-[#7FAAF5] hover:underline disabled:opacity-50"
+  >
+    {aiLoading ? "Thinking..." : "✨ Improve with AI"}
+  </button>
+</div>
+
+<textarea
+  value={newOverview}
+  onChange={(e) => setNewOverview(e.target.value)}
+  className="mt-1 w-full rounded-md border px-3 py-2"
+  rows={3}
+  required
+/>
+
                 <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={() => setIsAddModalOpen(false)} className="rounded-lg border px-5 py-2.5 text-sm hover:bg-gray-50">Cancel</button><button type="submit" className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm text-white hover:bg-blue-700">Create Project</button></div>
               </form>
             </div>
