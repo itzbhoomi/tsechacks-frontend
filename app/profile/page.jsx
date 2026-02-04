@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   AreaChart,
   Area,
@@ -66,7 +66,6 @@ function DonationModal({ project, open, onClose }) {
     setLoading(true);
 
     try {
-      // 1. CALL THE INTENT API
       const response = await fetch("https://api.fmm.finternetlab.io/api/v1/payment-intents", {
         method: "POST",
         headers: {
@@ -89,7 +88,6 @@ function DonationModal({ project, open, onClose }) {
       const result = await response.json();
 
       if (result && result.data && result.data.paymentUrl) {
-        // 2. STORE TRANSACTION IN DB
         await addDoc(collection(db, "transactions"), {
           projectId: project.id,
           projectTitle: project.title,
@@ -101,7 +99,6 @@ function DonationModal({ project, open, onClose }) {
           createdAt: serverTimestamp(),
         });
 
-        // 3. INCREMENT GLOBAL POOL
         const poolRef = doc(db, "pool", "main");
         await setDoc(
           poolRef,
@@ -109,7 +106,6 @@ function DonationModal({ project, open, onClose }) {
           { merge: true }
         );
 
-        // 4. REDIRECT
         window.location.href = result.data.paymentUrl;
       } else {
         alert("Failed to initiate payment. API response error.");
@@ -186,16 +182,18 @@ function ProjectModal({ project, open, onClose, userRole }) {
   const [isReimburseFormOpen, setIsReimburseFormOpen] = useState(false);
   const [billFile, setBillFile] = useState(null);
   const [showDonation, setShowDonation] = useState(false);
+  
+  // Ref for the hidden evidence input
+  const fileInputRef = useRef(null);
+  const [uploadingStepId, setUploadingStepId] = useState(null);
 
   useEffect(() => {
     if (!open || !project) return;
 
-    // Budget
     if (project.budget?.length === 4) {
       setBudgetData(budgetLabels.map((label, i) => ({ name: label, value: project.budget[i] })));
     }
 
-    // Timeline steps
     if (project.timeline?.length === 4) {
       const steps = projectStepsTemplate.map((step, idx) => ({
         ...step,
@@ -206,6 +204,19 @@ function ProjectModal({ project, open, onClose, userRole }) {
       setProjectSteps(steps);
     }
   }, [open, project]);
+
+  const handleEvidenceClick = (stepId) => {
+    setUploadingStepId(stepId);
+    fileInputRef.current?.click();
+  };
+
+  const handleEvidenceUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      alert(`Evidence for step ${uploadingStepId} ("${file.name}") selected!`);
+      // Future logic for upload goes here
+    }
+  };
 
   const handleReimburseSubmit = (e) => {
     e.preventDefault();
@@ -229,7 +240,6 @@ function ProjectModal({ project, open, onClose, userRole }) {
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
         <div className="relative z-10 w-full max-w-4xl rounded-3xl border border-[#E1EAF8] bg-white shadow-xl">
-          {/* Header */}
           <div className="flex items-start justify-between border-b border-[#E1EAF8] px-8 py-6">
             <div>
               <h2 className="font-serif text-2xl">{project.title}</h2>
@@ -243,13 +253,10 @@ function ProjectModal({ project, open, onClose, userRole }) {
             </button>
           </div>
 
-          {/* Body */}
           <div className="grid grid-cols-1 gap-10 px-8 py-6 md:grid-cols-[60%_40%]">
-            {/* Left column */}
             <div className="space-y-8">
               <p className="text-sm text-[#5C6B82]">{project.overview}</p>
 
-              {/* Funding progress */}
               <div>
                 <div className="mb-2 flex justify-between text-xs text-[#7A8CA5]">
                   <span>Funding progress</span>
@@ -263,9 +270,18 @@ function ProjectModal({ project, open, onClose, userRole }) {
                 </div>
               </div>
 
-              {/* Timeline */}
               <div>
                 <p className="mb-4 text-sm font-medium">Project Timeline</p>
+                
+                {/* Hidden File Input for Evidence */}
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept="image/*"
+                  onChange={handleEvidenceUpload}
+                />
+
                 <div className="flex items-center justify-between">
                   {projectSteps.map((step, idx) => {
                     const isActive = step.id === currentStep;
@@ -297,12 +313,22 @@ function ProjectModal({ project, open, onClose, userRole }) {
                 </div>
 
                 <div className="mt-4 rounded-xl border border-[#E1EAF8] bg-[#F9FBFF] p-4">
-                  <p className="text-sm font-medium">{activeStep.title}</p>
-                  <p className="mt-1 text-xs text-[#5C6B82]">{activeStep.details}</p>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{activeStep.title}</p>
+                      <p className="mt-1 text-xs text-[#5C6B82]">{activeStep.details}</p>
+                    </div>
+                    {/* ADDED EVIDENCE BUTTON */}
+                    <button 
+                      onClick={() => handleEvidenceClick(activeStep.id)}
+                      className="rounded-lg bg-white border border-[#DCE6F7] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#7FAAF5] hover:bg-[#F4F7FD] transition shadow-sm"
+                    >
+                      + Evidence
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Tags */}
               <div className="flex flex-wrap gap-2">
                 {project.contributions?.map((c) => (
                   <span
@@ -314,7 +340,6 @@ function ProjectModal({ project, open, onClose, userRole }) {
                 ))}
               </div>
 
-              {/* CTA buttons */}
               <div className="flex gap-3 pt-4">
                 {userRole === "creator" ? (
                   <>
@@ -347,7 +372,6 @@ function ProjectModal({ project, open, onClose, userRole }) {
               </div>
             </div>
 
-            {/* Right column – Budget Pie */}
             <div className="rounded-2xl bg-[#F7FAFF] p-5">
               <p className="mb-4 text-sm font-medium">Budget Allocation</p>
               <div className="h-56">
@@ -388,7 +412,6 @@ function ProjectModal({ project, open, onClose, userRole }) {
         </div>
       </div>
 
-      {/* Reimbursement modal */}
       {isReimburseFormOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setIsReimburseFormOpen(false)} />
@@ -422,7 +445,6 @@ function ProjectModal({ project, open, onClose, userRole }) {
         </div>
       )}
 
-      {/* Donation modal */}
       <DonationModal project={project} open={showDonation} onClose={() => setShowDonation(false)} />
     </>
   );
@@ -435,6 +457,8 @@ export default function Profile() {
   const [ongoingProjects, setOngoingProjects] = useState([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
+  const [poolTotal, setPoolTotal] = useState(0);
+  const [randomUser, setRandomUser] = useState({ name: "Loading...", photo: "" });
 
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("");
@@ -445,6 +469,37 @@ export default function Profile() {
   const [fundingRequired, setFundingRequired] = useState(0);
 
   const userRole = typeof window !== "undefined" ? localStorage.getItem("userRole") || "contributor" : "contributor";
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await fetch("https://randomuser.me/api/");
+        const data = await res.json();
+        const user = data.results[0];
+        setRandomUser({
+          name: `${user.name.first} ${user.name.last}`,
+          photo: user.picture.large,
+        });
+      } catch (err) {
+        console.error("Failed to fetch random user", err);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  useEffect(() => {
+    const fetchPoolData = async () => {
+      try {
+        const poolSnap = await getDoc(doc(db, "pool", "main"));
+        if (poolSnap.exists()) {
+          setPoolTotal(poolSnap.data().total || 0);
+        }
+      } catch (err) {
+        console.error("Failed to load pool data:", err);
+      }
+    };
+    fetchPoolData();
+  }, []);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -501,22 +556,25 @@ export default function Profile() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-50 to-white px-5 py-10 md:px-8">
       <div className="mx-auto max-w-6xl">
-        {/* Profile Header */}
         <section className="rounded-3xl border bg-white p-8 shadow-sm">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
             <div className="relative">
-              <img
-                src="https://i.pravatar.cc/120?img=68"
-                alt="Profile"
-                className="h-28 w-28 rounded-full border-4 border-white object-cover shadow"
-              />
+              {randomUser.photo ? (
+                <img
+                  src={randomUser.photo}
+                  alt="Profile"
+                  className="h-28 w-28 rounded-full border-4 border-white object-cover shadow"
+                />
+              ) : (
+                <div className="h-28 w-28 rounded-full bg-gray-200 animate-pulse" />
+              )}
               <span className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[#7FAAF5] text-xs text-white ring-2 ring-white">
                 ✓
               </span>
             </div>
             <div className="flex-1">
               <h1 className="flex items-center gap-2 font-serif text-3xl">
-                Luna Zhao <span className="text-[#7FAAF5]">✔</span>
+                {randomUser.name} <span className="text-[#7FAAF5]">✔</span>
               </h1>
               <p className="mt-1 text-sm text-gray-600">Digital Artist & Innovator</p>
               <p className="mt-3 max-w-xl text-sm text-gray-600">
@@ -534,10 +592,8 @@ export default function Profile() {
           </div>
         </section>
 
-        {/* Main grid */}
         <section className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[65%_35%]">
           <div className="space-y-10">
-            {/* Ongoing Projects */}
             <div>
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="font-serif text-2xl">Ongoing Projects</h2>
@@ -570,7 +626,6 @@ export default function Profile() {
               )}
             </div>
 
-            {/* Past Projects – mock */}
             <div>
               <h2 className="mb-5 font-serif text-2xl">Past Projects</h2>
               <div className="grid gap-5 sm:grid-cols-2">
@@ -592,7 +647,6 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Analytics */}
           <aside className="space-y-6 rounded-3xl bg-[#F4F7FD] p-6">
             <h2 className="font-serif text-2xl">Creator Analytics</h2>
 
@@ -603,7 +657,7 @@ export default function Profile() {
               </div>
               <div className="rounded-2xl bg-white p-4 shadow-sm border">
                 <p className="text-xs text-gray-500">Avg Contribution</p>
-                <p className="mt-1 text-2xl font-semibold">$3,200</p>
+                <p className="mt-1 text-2xl font-semibold">${poolTotal.toLocaleString()}</p>
               </div>
             </div>
 
@@ -634,7 +688,6 @@ export default function Profile() {
           </aside>
         </section>
 
-        {/* Add Project Modal */}
         {isAddModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
@@ -765,7 +818,6 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Project Detail Modal */}
         {selectedProject && (
           <ProjectModal
             project={selectedProject}
