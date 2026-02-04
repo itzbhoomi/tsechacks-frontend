@@ -3,8 +3,6 @@ import React, { useState, useEffect } from "react";
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   Tooltip,
   ResponsiveContainer,
@@ -50,11 +48,12 @@ const projectStepsTemplate = [
 ];
 
 // ── PROJECT DETAILS MODAL ──
-function ProjectModal({ projectId, open, onClose }) {
+function ProjectModal({ projectId, open, onClose, userRole }) {
   const [project, setProject] = useState(null);
   const [budgetData, setBudgetData] = useState([]);
   const [projectSteps, setProjectSteps] = useState(projectStepsTemplate);
   const [currentStep, setCurrentStep] = useState(3);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
     if (!open || !projectId) return;
@@ -107,7 +106,7 @@ function ProjectModal({ projectId, open, onClose }) {
           <div>
             <h2 className="font-serif text-2xl">{project.title}</h2>
             <p className="mt-1 text-sm text-[#5C6B82]">
-               {project.category}
+              {project.category}
             </p>
           </div>
           <button
@@ -185,10 +184,30 @@ function ProjectModal({ projectId, open, onClose }) {
               ))}
             </div>
 
-            {/* CTA */}
+            {/* CTA BUTTONS */}
             <div className="flex gap-3 pt-4">
-              <button className="rounded-xl bg-[#7FAAF5] px-6 py-3 text-sm text-white">Support Project</button>
-              <button className="rounded-xl border px-6 py-3 text-sm">Collaborate</button>
+              {userRole === "creator" ? (
+                <>
+                  <button className="rounded-xl bg-green-500 px-6 py-3 text-sm text-white">
+                    Invite via Email
+                  </button>
+                  <button className="rounded-xl border px-6 py-3 text-sm">
+                    Reimburse from Contributors Pool
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="rounded-xl bg-[#7FAAF5] px-6 py-3 text-sm text-white">
+                    Support Project
+                  </button>
+                  <button
+                    className="rounded-xl border px-6 py-3 text-sm"
+                    onClick={() => setIsChatOpen(true)}
+                  >
+                    Collaborate
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -213,7 +232,7 @@ function ProjectModal({ projectId, open, onClose }) {
                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[i] }} />
                     {b.name}
                   </div>
-                  <span>{b.value}%</span>
+                  <span>{b.value} USD</span>
                 </div>
               ))}
             </div>
@@ -238,6 +257,14 @@ export default function Profile() {
   const [budget, setBudget] = useState([0, 0, 0, 0]);
   const [fundingRequired, setFundingRequired] = useState(0);
 
+  const [userRole, setUserRole] = useState(""); // ← ADDED: creator/contributor
+
+  // Fetch user role from localStorage (set during onboarding)
+  useEffect(() => {
+    const role = localStorage.getItem("userRole");
+    if (role) setUserRole(role);
+  }, []);
+
   // Fetch ongoing projects dynamically
   useEffect(() => {
     const fetchOngoingProjects = async () => {
@@ -256,14 +283,14 @@ export default function Profile() {
   const handleAddProject = async (e) => {
     e.preventDefault();
     const totalBudget = budget.reduce((a, b) => a + b, 0);
-    if (totalBudget !== 100) return alert("Budget must sum up to 100%");
     const project = {
       title: newTitle,
       category: newCategory,
-      description: newOverview,
+      overview: newOverview,
       timeline,
       contributions,
-      budget,
+      budget,          // stored in USD
+      totalBudget,     // optional total
       fundingRequired,
       completed: false,
       createdAt: serverTimestamp(),
@@ -374,7 +401,135 @@ export default function Profile() {
 
         {/* PROJECT MODAL */}
         {isModalOpen && (
-          <div> {/* dynamic add project modal JSX here */} </div>
+          <div> 
+            {isModalOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setIsModalOpen(false)}>
+    <div className="relative w-full max-w-3xl rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+      <h2 className="mb-4 text-xl font-semibold">Add New Project</h2>
+      <form onSubmit={handleAddProject} className="space-y-4 overflow-y-auto max-h-[80vh]">
+        {/* Project Title */}
+        <div>
+          <label className="text-sm font-medium">Project Title</label>
+          <input
+            type="text"
+            placeholder="Enter project title"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            className="w-full rounded-md border px-3 py-2 mt-1"
+            required
+          />
+        </div>
+
+        {/* Category */}
+        <div>
+          <label className="text-sm font-medium">Category</label>
+          <select
+            value={newCategory}
+            onChange={(e) => setNewCategory(e.target.value)}
+            className="w-full rounded-md border px-3 py-2 mt-1"
+            required
+          >
+            <option value="">Select category</option>
+            <option value="Art">Art</option>
+            <option value="Education">Education</option>
+            <option value="Entertainment">Entertainment</option>
+            <option value="Technology">Technology</option>
+          </select>
+        </div>
+
+        {/* Project Overview */}
+        <div>
+          <label className="text-sm font-medium">Project Overview</label>
+          <textarea
+            placeholder="Brief overview of the project"
+            value={newOverview}
+            onChange={(e) => setNewOverview(e.target.value)}
+            className="w-full rounded-md border px-3 py-2 mt-1"
+            rows={3}
+            required
+          />
+        </div>
+
+        {/* Project Timeline */}
+        <div>
+          <label className="text-sm font-medium">Project Timeline</label>
+          {["Idea & Research", "Prototype Development", "Funding Phase", "Production & Launch"].map((step, idx) => (
+            <div key={step} className="mt-2">
+              <p className="text-xs font-medium">{step}</p>
+              <input
+                type="text"
+                placeholder={`Details for ${step}`}
+                value={timeline[idx]}
+                onChange={(e) => {
+                  const newTimeline = [...timeline];
+                  newTimeline[idx] = e.target.value;
+                  setTimeline(newTimeline);
+                }}
+                className="w-full rounded-md border px-3 py-2 mt-1"
+                required
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Required Contributions */}
+        <div>
+          <label className="text-sm font-medium">Required Contributions</label>
+          <div className="flex gap-4 mt-1">
+            {["Funding", "Collaboration", "Mentorship"].map((c) => (
+              <label key={c} className="flex items-center gap-1 text-sm">
+                <input
+                  type="checkbox"
+                  checked={contributions.includes(c)}
+                  onChange={(e) => {
+                    if (e.target.checked) setContributions([...contributions, c]);
+                    else setContributions(contributions.filter((x) => x !== c));
+                  }}
+                />
+                {c}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Budget Allocation */}
+        <div>
+          <label className="text-sm font-medium">Budget Allocation (USD)</label>
+          {["Production", "Marketing", "Logistics", "Platform Fees"].map((b, idx) => (
+            <div key={b} className="mt-2 flex items-center gap-2">
+              <span className="w-28 text-xs">{b}</span>
+              <input
+                type="number"
+                value={budget[idx]}
+                onChange={(e) => {
+                  const newBudget = [...budget];
+                  newBudget[idx] = parseFloat(e.target.value) || 0;
+                  setBudget(newBudget);
+                }}
+                className="w-full rounded-md border px-3 py-2"
+                min={0}
+                required
+              />
+              <span>USD</span>
+            </div>
+          ))}
+
+          {/* Total Budget */}
+          <div className="mt-4 text-right text-sm font-semibold">
+            Total: <span className="text-lg">${budget.reduce((a, b) => a + b, 0)}</span> USD
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-md border px-4 py-2 hover:bg-gray-100">Cancel</button>
+          <button type="submit" className="rounded-md bg-blue-500 px-4 py-2 text-white hover:bg-blue-600">Add Project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
+          </div>
         )}
 
         {/* PROJECT DETAILS MODAL */}
@@ -383,6 +538,7 @@ export default function Profile() {
             projectId={selectedProjectId}
             open={!!selectedProjectId}
             onClose={() => setSelectedProjectId(null)}
+            userRole={userRole}
           />
         )}
       </div>

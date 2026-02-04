@@ -38,15 +38,27 @@ const questions = [
 export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({});
+  const [userRole, setUserRole] = useState(""); // new state
+
 
   const current = questions[step];
 
-  function handleSelect(option) {
-    setAnswers({ ...answers, [current.id]: option });
-    setTimeout(() => {
-      setStep((prev) => prev + 1);
-    }, 250);
+function handleSelect(option) {
+  // If first step, store role
+  if (step === 0) {
+    const role = option.toLowerCase(); // "creator" or "contributor"
+    setUserRole(role);
+    localStorage.setItem("userRole", role); // ← store persistently
   }
+
+  setAnswers({ ...answers, [current.id]: option });
+
+  setTimeout(() => {
+    setStep((prev) => prev + 1);
+  }, 250);
+}
+
+
 
   return (
     <div className="min-h-screen bg-blue-100 font-sans text-[#1E2A3B]">
