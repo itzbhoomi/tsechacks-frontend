@@ -80,15 +80,11 @@ export default function DonationModal({ project, open, onClose }) {
       <div className="relative z-10 w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
         <div className="mb-6 flex items-center justify-between">
           <h3 className="font-serif text-xl">Support {project.title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            ✕
-          </button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
         </div>
 
         <div className="mb-6 flex flex-col items-center justify-center rounded-2xl bg-[#F7FAFF] py-8 border border-[#E1EAF8]">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#7FAAF5]">
-            Enter Amount
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#7FAAF5]">Enter Amount</p>
           <div className="flex items-baseline text-[#1E2A3B]">
             <span className="text-3xl font-bold">$</span>
             <input
